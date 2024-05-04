@@ -1,5 +1,6 @@
-import calendar
-import random
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import pandas as pd
 import math
@@ -48,12 +49,44 @@ def gain_ratio(data, feature, targ):
     return information_gain(data, feature, targ) / intrinstic_information(data, feature)
 
 
+def clear_dataset(data, targ):
+    for col in data.columns:
+        miss = np.mean(data[col].isnull())
+        if miss > 0.2:
+            data.drop(col, axis=1, inplace=True)
+        # m = data[col].median()
+        # data[col] = data[col].fillna(m)
+    # data.boxplot(column=['Processor_Speed'])
+    # print(data['Processor_Speed'].describe())
+    # data['Storage_Capacity'].value_counts().plot.bar()
+    num_rows = len(data.index)
+    # too much same values
+    no_inf_features = []
+    for col in data.columns:
+        counts = data[col].value_counts(dropna=False)
+        pct_same = (counts / num_rows).iloc[0]
+        if pct_same > 0.8:
+            no_inf_features.append(col)
+    for col in no_inf_features:
+        data.drop(col, axis=1, inplace=True)
+    target_corr = data.corrwith(data[targ])
+    good_features = target_corr[abs(target_corr.abs()) > 0.03].index.tolist()
+    return data[good_features]
+
+
 if __name__ == '__main__':
     laptops = pd.read_csv('Laptop_price.csv')
     target = 'Price'
+    laptops['Brand'], _ = pd.factorize(laptops['Brand'])
+    laptops = clear_dataset(laptops, target)
+    corr_matrix = laptops.corr()
+    plt.figure(figsize=(8, 8))
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+    # plt.show()
     laptops[target] = pd.cut(laptops[target], bins=3)
+
     for f in laptops.columns.array:
         if not is_feature_discrete(laptops, f):
             laptops[f] = pd.cut(laptops[f], bins=3)
         if f != target:
-            print(f, gain_ratio(laptops, f, target))
+            print(f + ' gain ratio', gain_ratio(laptops, f, target))
